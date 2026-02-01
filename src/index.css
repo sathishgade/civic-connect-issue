@@ -2,95 +2,111 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Government-grade civic color palette */
+    --background: 210 20% 98%;
+    --foreground: 215 25% 15%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 215 25% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 215 25% 15%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Navy blue - trust, authority, professionalism */
+    --primary: 213 55% 24%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Soft gray for secondary elements */
+    --secondary: 210 15% 95%;
+    --secondary-foreground: 215 25% 25%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 210 15% 92%;
+    --muted-foreground: 215 12% 45%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* Forest green - growth, resolution, success */
+    --accent: 145 35% 28%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 214 20% 88%;
+    --input: 214 20% 88%;
+    --ring: 213 55% 24%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 0 0% 98%;
+    /* Status colors */
+    --status-pending: 38 92% 50%;
+    --status-in-progress: 213 55% 45%;
+    --status-resolved: 145 45% 42%;
+    --status-closed: 215 12% 55%;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    /* Civic-specific tokens */
+    --civic-navy: 213 55% 24%;
+    --civic-navy-light: 213 45% 35%;
+    --civic-green: 145 35% 28%;
+    --civic-green-light: 145 30% 45%;
+    --civic-gold: 38 92% 50%;
+    --civic-surface: 210 20% 98%;
 
-    --sidebar-primary: 240 5.9% 10%;
+    /* Shadows */
+    --shadow-soft: 0 2px 8px -2px hsl(215 25% 15% / 0.08);
+    --shadow-card: 0 4px 16px -4px hsl(215 25% 15% / 0.1);
+    --shadow-elevated: 0 8px 32px -8px hsl(215 25% 15% / 0.15);
 
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Sidebar */
+    --sidebar-background: 213 55% 24%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 0 0% 100%;
+    --sidebar-primary-foreground: 213 55% 24%;
+    --sidebar-accent: 213 45% 30%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 213 45% 30%;
+    --sidebar-ring: 0 0% 100%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 215 25% 10%;
+    --foreground: 210 20% 95%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 215 25% 13%;
+    --card-foreground: 210 20% 95%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 215 25% 13%;
+    --popover-foreground: 210 20% 95%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 210 60% 65%;
+    --primary-foreground: 215 25% 10%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 215 20% 18%;
+    --secondary-foreground: 210 20% 90%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 215 20% 18%;
+    --muted-foreground: 215 15% 60%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 145 40% 50%;
+    --accent-foreground: 215 25% 10%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 65% 55%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --border: 215 20% 20%;
+    --input: 215 20% 20%;
+    --ring: 210 60% 65%;
+
+    --sidebar-background: 215 25% 12%;
+    --sidebar-foreground: 210 20% 95%;
+    --sidebar-primary: 210 60% 65%;
+    --sidebar-primary-foreground: 215 25% 10%;
+    --sidebar-accent: 215 20% 18%;
+    --sidebar-accent-foreground: 210 20% 95%;
+    --sidebar-border: 215 20% 20%;
+    --sidebar-ring: 210 60% 65%;
   }
 }
 
@@ -100,6 +116,153 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+}
+
+@layer components {
+  /* Government-grade button styles */
+  .btn-civic {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 text-base font-medium 
+           rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 
+           focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-civic-primary {
+    @apply btn-civic bg-primary text-primary-foreground hover:bg-primary/90 
+           focus:ring-primary shadow-soft hover:shadow-card;
+  }
+
+  .btn-civic-accent {
+    @apply btn-civic bg-accent text-accent-foreground hover:bg-accent/90 
+           focus:ring-accent shadow-soft hover:shadow-card;
+  }
+
+  .btn-civic-outline {
+    @apply btn-civic border-2 border-primary text-primary bg-transparent 
+           hover:bg-primary hover:text-primary-foreground focus:ring-primary;
+  }
+
+  .btn-civic-large {
+    @apply px-8 py-4 text-lg rounded-xl min-h-[56px];
+  }
+
+  /* Card variants */
+  .card-civic {
+    @apply bg-card rounded-xl border border-border p-6 shadow-soft;
+  }
+
+  .card-civic-elevated {
+    @apply card-civic shadow-card hover:shadow-elevated transition-shadow duration-200;
+  }
+
+  /* Status badges */
+  .status-badge {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 text-sm font-medium rounded-full;
+  }
+
+  .status-pending {
+    @apply status-badge bg-[hsl(var(--status-pending)/0.15)] text-[hsl(var(--status-pending))];
+  }
+
+  .status-in-progress {
+    @apply status-badge bg-[hsl(var(--status-in-progress)/0.15)] text-[hsl(var(--status-in-progress))];
+  }
+
+  .status-resolved {
+    @apply status-badge bg-[hsl(var(--status-resolved)/0.15)] text-[hsl(var(--status-resolved))];
+  }
+
+  .status-closed {
+    @apply status-badge bg-[hsl(var(--status-closed)/0.15)] text-[hsl(var(--status-closed))];
+  }
+
+  /* Form inputs - large and accessible */
+  .input-civic {
+    @apply w-full px-4 py-3 text-base border-2 border-input rounded-lg bg-background
+           focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none
+           transition-all duration-200 placeholder:text-muted-foreground;
+  }
+
+  .input-civic-large {
+    @apply input-civic py-4 text-lg;
+  }
+
+  /* Section styling */
+  .section-civic {
+    @apply py-16 md:py-24;
+  }
+
+  .container-civic {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  /* Trust badge */
+  .trust-badge {
+    @apply inline-flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground 
+           rounded-full text-sm font-medium;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .gradient-civic {
+    background: linear-gradient(135deg, hsl(var(--civic-navy)) 0%, hsl(var(--civic-navy-light)) 100%);
+  }
+
+  .gradient-civic-green {
+    background: linear-gradient(135deg, hsl(var(--civic-green)) 0%, hsl(var(--civic-green-light)) 100%);
+  }
+
+  .gradient-hero {
+    background: linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--secondary)) 100%);
+  }
+
+  /* Animation utilities */
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-out forwards;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.5s ease-out forwards;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.3s ease-out forwards;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    from { 
+      opacity: 0; 
+      transform: translateY(20px); 
+    }
+    to { 
+      opacity: 1; 
+      transform: translateY(0); 
+    }
+  }
+
+  @keyframes scaleIn {
+    from { 
+      opacity: 0; 
+      transform: scale(0.95); 
+    }
+    to { 
+      opacity: 1; 
+      transform: scale(1); 
+    }
   }
 }
