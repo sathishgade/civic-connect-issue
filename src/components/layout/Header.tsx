@@ -9,14 +9,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { 
-  Building2, 
-  Menu, 
-  User, 
-  LogOut, 
+import {
+  Building2,
+  Menu,
+  User,
+  LogOut,
   LayoutDashboard,
   Globe,
-  ChevronDown
+  ChevronDown,
+  Shield,
+  Briefcase
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -26,8 +28,8 @@ export function Header() {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/');
   };
 
@@ -60,23 +62,42 @@ export function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-6">
-            <Link 
-              to="/" 
+            <Link
+              to="/"
               className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
             >
               {t('nav.home')}
             </Link>
             {isAuthenticated && (
               <>
-                <Link 
-                  to={getDashboardLink()} 
-                  className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {t('nav.dashboard')}
-                </Link>
+                {user?.role === 'admin' ? (
+                  <Link
+                    to="/admin"
+                    className="flex items-center gap-1.5 text-sm font-medium text-purple-600 hover:text-purple-700 transition-colors bg-purple-50 px-3 py-1.5 rounded-full border border-purple-100"
+                  >
+                    <Shield className="h-4 w-4" />
+                    Admin Portal
+                  </Link>
+                ) : user?.role === 'employee' ? (
+                  <Link
+                    to="/employee"
+                    className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors bg-blue-50 px-3 py-1.5 rounded-full border border-blue-100"
+                  >
+                    <Briefcase className="h-4 w-4" />
+                    Employee Portal
+                  </Link>
+                ) : (
+                  <Link
+                    to="/dashboard"
+                    className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {t('nav.dashboard')}
+                  </Link>
+                )}
+
                 {user?.role === 'citizen' && (
-                  <Link 
-                    to="/complaint/new" 
+                  <Link
+                    to="/complaint/new"
                     className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
                   >
                     {t('nav.newComplaint')}
@@ -162,8 +183,8 @@ export function Header() {
         {mobileMenuOpen && (
           <div className="md:hidden py-4 border-t border-border animate-slide-down">
             <nav className="flex flex-col gap-2">
-              <Link 
-                to="/" 
+              <Link
+                to="/"
                 className="px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors"
                 onClick={() => setMobileMenuOpen(false)}
               >
@@ -171,16 +192,16 @@ export function Header() {
               </Link>
               {isAuthenticated && (
                 <>
-                  <Link 
-                    to={getDashboardLink()} 
+                  <Link
+                    to={getDashboardLink()}
                     className="px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     {t('nav.dashboard')}
                   </Link>
                   {user?.role === 'citizen' && (
-                    <Link 
-                      to="/complaint/new" 
+                    <Link
+                      to="/complaint/new"
                       className="px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors"
                       onClick={() => setMobileMenuOpen(false)}
                     >

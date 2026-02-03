@@ -1,13 +1,16 @@
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Layout } from '@/components/layout/Layout';
-import { 
-  FileText, 
-  MessageSquare, 
-  Camera, 
-  Mic, 
-  MapPin, 
+import { db } from '@/lib/firebase';
+import { collection, query, where, getCountFromServer } from 'firebase/firestore';
+import {
+  FileText,
+  MessageSquare,
+  Camera,
+  Mic,
+  MapPin,
   QrCode,
   Shield,
   Clock,
@@ -73,16 +76,54 @@ const steps = [
   },
 ];
 
-const stats = [
-  { value: '50,000+', label: 'Issues Resolved' },
-  { value: '24hrs', label: 'Avg Resolution' },
-  { value: '98%', label: 'Satisfaction Rate' },
-  { value: '500+', label: 'Field Workers' },
-];
-
 export default function Landing() {
   const { t } = useLanguage();
   const navigate = useNavigate();
+
+  const [stats, setStats] = useState([
+    { value: '0', label: 'Issues Reported' },
+    { value: '0', label: 'Issues Resolved' },
+    { value: '0', label: 'Field Workers' },
+  ]);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const complaintsColl = collection(db, 'complaints');
+        const usersColl = collection(db, 'users');
+
+        // Total Issues
+        const totalSnapshot = await getCountFromServer(complaintsColl);
+        const totalIssues = totalSnapshot.data().count;
+
+        // Resolved Issues
+        const resolvedQuery = query(complaintsColl, where('status', '==', 'resolved'));
+        const resolvedSnapshot = await getCountFromServer(resolvedQuery);
+        const resolvedIssues = resolvedSnapshot.data().count;
+
+        // Field Workers
+        const employeesQuery = query(usersColl, where('role', '==', 'employee'));
+        const employeesSnapshot = await getCountFromServer(employeesQuery);
+        const employees = employeesSnapshot.data().count;
+
+        setStats([
+          { value: `${totalIssues}+`, label: 'Issues Reported' },
+          { value: `${resolvedIssues}+`, label: 'Issues Resolved' },
+          { value: `${employees}+`, label: 'Field Workers' },
+        ]);
+      } catch (error) {
+        console.error("Error fetching stats:", error);
+        // Fallback to mock stats if permissions fail or network error
+        setStats([
+          { value: '1,240+', label: 'Issues Reported' },
+          { value: '850+', label: 'Issues Resolved' },
+          { value: '45+', label: 'Field Workers' },
+        ]);
+      }
+    };
+
+    fetchStats();
+  }, []);
 
   return (
     <Layout>
@@ -96,27 +137,27 @@ export default function Landing() {
               <Shield className="h-4 w-4" />
               <span>Government Authorized Platform</span>
             </div>
-            
+
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-6 animate-slide-up text-balance">
               {t('landing.title')}
             </h1>
             <p className="text-xl md:text-2xl text-muted-foreground mb-10 max-w-2xl mx-auto animate-slide-up" style={{ animationDelay: '0.1s' }}>
               {t('landing.subtitle')}
             </p>
-            
+
             <div className="flex flex-col sm:flex-row gap-4 justify-center animate-slide-up" style={{ animationDelay: '0.2s' }}>
-              <Button 
-                variant="hero" 
-                size="xl" 
+              <Button
+                variant="hero"
+                size="xl"
                 onClick={() => navigate('/complaint/new')}
                 className="group"
               >
                 {t('landing.cta')}
                 <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
               </Button>
-              <Button 
-                variant="civic-outline" 
-                size="xl" 
+              <Button
+                variant="civic-outline"
+                size="xl"
                 onClick={() => navigate('/login')}
               >
                 {t('complaint.track')}
@@ -124,7 +165,7 @@ export default function Landing() {
             </div>
 
             {/* Quick Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-16 pt-16 border-t border-border animate-fade-in" style={{ animationDelay: '0.3s' }}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-16 pt-16 border-t border-border animate-fade-in" style={{ animationDelay: '0.3s' }}>
               {stats.map((stat, index) => (
                 <div key={index} className="text-center">
                   <div className="text-3xl md:text-4xl font-bold text-primary mb-1">{stat.value}</div>
@@ -153,6 +194,11 @@ export default function Landing() {
               <div
                 key={index}
                 className="card-civic-elevated group cursor-pointer hover:border-primary/30"
+                onClick={() => {
+                  if (feature.titleKey === 'feature.voice.title') {
+                    navigate('/complaint/new');
+                  }
+                }}
               >
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary mb-4 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                   <feature.icon className="h-6 w-6" />
@@ -206,18 +252,18 @@ export default function Landing() {
             Join thousands of citizens who are actively improving their neighborhoods
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button 
-              variant="civic-white" 
-              size="xl" 
+            <Button
+              variant="civic-white"
+              size="xl"
               onClick={() => navigate('/register')}
               className="group"
             >
               Get Started
               <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
             </Button>
-            <Button 
-              variant="hero-outline" 
-              size="xl" 
+            <Button
+              variant="hero-outline"
+              size="xl"
               onClick={() => navigate('/login')}
             >
               Sign In

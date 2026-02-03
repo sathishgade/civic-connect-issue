@@ -10,10 +10,10 @@ import { Building2, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, googleLogin } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
-  
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -22,34 +22,26 @@ export default function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     try {
       await login(email, password);
-      toast.success('Welcome back!');
+      // toast.success('Welcome back!'); // Auth state change handles redirect ideally, but we can do it here too
       navigate('/dashboard');
-    } catch (error) {
+    } catch (error: any) {
+      console.error(error);
       toast.error('Invalid email or password');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleDemoLogin = async (role: 'citizen' | 'admin' | 'employee') => {
-    const demoCredentials = {
-      citizen: { email: 'citizen@demo.com', password: 'demo123' },
-      admin: { email: 'admin@demo.com', password: 'demo123' },
-      employee: { email: 'employee@demo.com', password: 'demo123' },
-    };
-    
-    setIsLoading(true);
+  const handleGoogleLogin = async () => {
     try {
-      await login(demoCredentials[role].email, demoCredentials[role].password);
-      toast.success(`Logged in as ${role}`);
-      navigate(role === 'citizen' ? '/dashboard' : role === 'admin' ? '/admin' : '/employee');
+      await googleLogin();
+      navigate('/dashboard');
     } catch (error) {
-      toast.error('Login failed');
-    } finally {
-      setIsLoading(false);
+      console.error(error);
+      toast.error('Google sign in failed');
     }
   };
 
@@ -118,43 +110,26 @@ export default function Login() {
               </Button>
             </form>
 
-            {/* Divider */}
             <div className="relative my-6">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-border" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="bg-card px-4 text-muted-foreground">or try demo accounts</span>
+                <span className="bg-card px-4 text-muted-foreground">Or continue with</span>
               </div>
             </div>
 
-            {/* Demo Login Buttons */}
-            <div className="grid grid-cols-3 gap-3">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => handleDemoLogin('citizen')}
-                disabled={isLoading}
-              >
-                Citizen
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => handleDemoLogin('admin')}
-                disabled={isLoading}
-              >
-                Admin
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => handleDemoLogin('employee')}
-                disabled={isLoading}
-              >
-                Employee
-              </Button>
-            </div>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={handleGoogleLogin}
+              disabled={isLoading}
+            >
+              <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512">
+                <path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path>
+              </svg>
+              Google
+            </Button>
           </div>
 
           {/* Register Link */}

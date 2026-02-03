@@ -2,12 +2,12 @@ export type UserRole = 'citizen' | 'admin' | 'employee';
 
 export type ComplaintStatus = 'pending' | 'in_progress' | 'resolved' | 'closed';
 
-export type ComplaintCategory = 
-  | 'road' 
-  | 'garbage' 
-  | 'drainage' 
-  | 'water' 
-  | 'streetlight' 
+export type ComplaintCategory =
+  | 'road'
+  | 'garbage'
+  | 'drainage'
+  | 'water'
+  | 'streetlight'
   | 'others';
 
 export type ComplaintPriority = 'low' | 'medium' | 'high' | 'critical';
@@ -46,6 +46,10 @@ export interface Complaint {
   createdAt: Date;
   updatedAt: Date;
   resolvedAt?: Date;
+  source?: 'form' | 'voice';
+  verificationToken?: string;
+  adminNote?: string;
+  resolutionImage?: string | null;
 }
 
 export interface StatusLog {

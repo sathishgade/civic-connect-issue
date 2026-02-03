@@ -1,13 +1,26 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole } from '@/types';
+import { auth, googleProvider, db } from '@/lib/firebase';
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  signOut,
+  onAuthStateChanged,
+  updateProfile,
+} from 'firebase/auth';
+import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
-  logout: () => void;
+  googleLogin: () => Promise<void>;
+  logout: () => Promise<void>;
   setLanguage: (lang: 'en' | 'te') => void;
+  loading: boolean;
 }
 
 interface RegisterData {
@@ -20,63 +33,74 @@ interface RegisterData {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Demo users for testing
-const DEMO_USERS: Record<string, User & { password: string }> = {
-  'citizen@demo.com': {
-    id: '1',
-    email: 'citizen@demo.com',
-    name: 'Ravi Kumar',
-    phone: '+91 9876543210',
-    role: 'citizen',
-    language: 'en',
-    createdAt: new Date(),
-    password: 'demo123',
-  },
-  'admin@demo.com': {
-    id: '2',
-    email: 'admin@demo.com',
-    name: 'Admin User',
-    phone: '+91 9876543211',
-    role: 'admin',
-    language: 'en',
-    createdAt: new Date(),
-    password: 'demo123',
-  },
-  'employee@demo.com': {
-    id: '3',
-    email: 'employee@demo.com',
-    name: 'Suresh Babu',
-    phone: '+91 9876543212',
-    role: 'employee',
-    language: 'en',
-    createdAt: new Date(),
-    password: 'demo123',
-  },
-};
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const login = useCallback(async (email: string, password: string) => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const demoUser = DEMO_USERS[email.toLowerCase()];
-    if (demoUser && demoUser.password === password) {
-      const { password: _, ...userWithoutPassword } = demoUser;
-      setUser(userWithoutPassword);
-      return;
-    }
-    
-    throw new Error('Invalid email or password');
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          const userDocRef = doc(db, 'users', firebaseUser.uid);
+          const userDoc = await getDoc(userDocRef);
+
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            setUser({
+              id: firebaseUser.uid,
+              email: firebaseUser.email || '',
+              name: userData.name || firebaseUser.displayName || 'User',
+              phone: userData.phone || firebaseUser.phoneNumber || undefined,
+              role: userData.role || 'citizen',
+              language: userData.language || 'en',
+              createdAt: userData.createdAt?.toDate() || new Date(),
+            });
+          } else {
+            // If user doc doesn't exist (e.g. first time Google Login), create it
+            const newUser: User = {
+              id: firebaseUser.uid,
+              email: firebaseUser.email || '',
+              name: firebaseUser.displayName || 'User',
+              phone: firebaseUser.phoneNumber || undefined,
+              role: 'citizen',
+              language: 'en',
+              createdAt: new Date(),
+            };
+
+            await setDoc(userDocRef, {
+              ...newUser,
+              createdAt: Timestamp.fromDate(newUser.createdAt)
+            });
+            setUser(newUser);
+          }
+        } catch (error) {
+          console.error("Error fetching user data:", error);
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  const register = useCallback(async (data: RegisterData) => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
+  const login = async (email: string, password: string) => {
+    await signInWithEmailAndPassword(auth, email, password);
+  };
+
+  const register = async (data: RegisterData) => {
+    const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+
+    // Update profile with name
+    await updateProfile(userCredential.user, {
+      displayName: data.name
+    });
+
+    // Create user document in Firestore
     const newUser: User = {
-      id: Date.now().toString(),
+      id: userCredential.user.uid,
       email: data.email,
       name: data.name,
       phone: data.phone,
@@ -84,19 +108,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       language: 'en',
       createdAt: new Date(),
     };
-    
-    setUser(newUser);
-  }, []);
 
-  const logout = useCallback(() => {
-    setUser(null);
-  }, []);
+    await setDoc(doc(db, 'users', userCredential.user.uid), {
+      ...newUser,
+      createdAt: Timestamp.fromDate(newUser.createdAt)
+    });
 
-  const setLanguage = useCallback((lang: 'en' | 'te') => {
+    // State update will be handled by onAuthStateChanged listener
+  };
+
+  const googleLogin = async () => {
+    await signInWithPopup(auth, googleProvider);
+    // User doc creation is handled in onAuthStateChanged if it doesn't exist
+  };
+
+  const logout = async () => {
+    await signOut(auth);
+  };
+
+  const setLanguage = (lang: 'en' | 'te') => {
     if (user) {
-      setUser({ ...user, language: lang });
+      const updatedUser = { ...user, language: lang };
+      setUser(updatedUser);
+      // Sync language preference to Firestore
+      setDoc(doc(db, 'users', user.id), { language: lang }, { merge: true });
     }
-  }, [user]);
+  };
 
   return (
     <AuthContext.Provider
@@ -105,11 +142,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAuthenticated: !!user,
         login,
         register,
+        googleLogin,
         logout,
         setLanguage,
+        loading
       }}
     >
-      {children}
+      {!loading && children}
     </AuthContext.Provider>
   );
 }

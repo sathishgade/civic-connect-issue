@@ -4,13 +4,15 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
-import { 
-  Complaint, 
-  ComplaintStatus, 
+import {
+  Complaint,
+  ComplaintStatus,
   DashboardStats,
   CATEGORY_LABELS,
   STATUS_LABELS
 } from '@/types';
+import { db } from '@/lib/firebase';
+import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
 import {
   Plus,
   FileText,
@@ -20,77 +22,23 @@ import {
   MapPin,
   Calendar,
   ChevronRight,
-  TrendingUp
+  TrendingUp,
+  Mic,
+  Pencil,
+  Trash2
 } from 'lucide-react';
-
-// Mock data for demo
-const mockComplaints: Complaint[] = [
-  {
-    id: '1',
-    userId: '1',
-    title: 'Pothole on Main Street',
-    description: 'Large pothole causing traffic issues',
-    category: 'road',
-    status: 'in_progress',
-    priority: 'high',
-    location: {
-      latitude: 17.3850,
-      longitude: 78.4867,
-      address: 'Main Street, Hyderabad',
-      area: 'Banjara Hills',
-    },
-    images: [],
-    assignedTo: '3',
-    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-    updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-  },
-  {
-    id: '2',
-    userId: '1',
-    title: 'Garbage not collected',
-    description: 'Garbage not collected for 3 days',
-    category: 'garbage',
-    status: 'pending',
-    priority: 'medium',
-    location: {
-      latitude: 17.4100,
-      longitude: 78.4750,
-      address: '12th Street, Jubilee Hills',
-      area: 'Jubilee Hills',
-    },
-    images: [],
-    createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-    updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-  },
-  {
-    id: '3',
-    userId: '1',
-    title: 'Street light not working',
-    description: 'Street light near park entrance is broken',
-    category: 'streetlight',
-    status: 'resolved',
-    priority: 'low',
-    location: {
-      latitude: 17.4200,
-      longitude: 78.4600,
-      address: 'Park Road, Madhapur',
-      area: 'Madhapur',
-    },
-    images: [],
-    qrCode: 'QR123456',
-    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-    updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-    resolvedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-  },
-];
-
-const mockStats: DashboardStats = {
-  totalComplaints: 3,
-  pendingComplaints: 1,
-  inProgressComplaints: 1,
-  resolvedComplaints: 1,
-  avgResolutionTime: 48,
-};
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { doc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { toast } from 'sonner';
 
 const statusConfig: Record<ComplaintStatus, { icon: typeof Clock; color: string; bgClass: string }> = {
   pending: { icon: Clock, color: 'text-status-pending', bgClass: 'status-pending' },
@@ -103,15 +51,67 @@ export default function CitizenDashboard() {
   const { user, isAuthenticated } = useAuth();
   const { t, language } = useLanguage();
   const navigate = useNavigate();
-  
-  const [complaints, setComplaints] = useState<Complaint[]>(mockComplaints);
-  const [stats, setStats] = useState<DashboardStats>(mockStats);
+
+  const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const [stats, setStats] = useState<DashboardStats>({
+    totalComplaints: 0,
+    pendingComplaints: 0,
+    inProgressComplaints: 0,
+    resolvedComplaints: 0,
+    avgResolutionTime: 0,
+  });
+  const [loading, setLoading] = useState(true);
+
+  // Edit State
+  const [editingComplaint, setEditingComplaint] = useState<Complaint | null>(null);
+  const [editForm, setEditForm] = useState({ title: '', description: '' });
+  const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
       navigate('/login');
+      return;
     }
-  }, [isAuthenticated, navigate]);
+
+    if (!user) return;
+
+    const q = query(
+      collection(db, 'complaints'),
+      where('userId', '==', user.id)
+      // orderBy('createdAt', 'desc') // Requires index for compound query with where
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedComplaints = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          createdAt: data.createdAt?.toDate() || new Date(),
+          updatedAt: data.updatedAt?.toDate() || new Date(),
+          resolvedAt: data.resolvedAt?.toDate(),
+        } as Complaint;
+      });
+
+      // Sort manually until index is created
+      fetchedComplaints.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+      setComplaints(fetchedComplaints);
+
+      // Calculate stats
+      const newStats = {
+        totalComplaints: fetchedComplaints.length,
+        pendingComplaints: fetchedComplaints.filter(c => c.status === 'pending').length,
+        inProgressComplaints: fetchedComplaints.filter(c => c.status === 'in_progress').length,
+        resolvedComplaints: fetchedComplaints.filter(c => c.status === 'resolved' || c.status === 'closed').length,
+        avgResolutionTime: 0, // Placeholder calculation
+      };
+      setStats(newStats);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [isAuthenticated, navigate, user]);
 
   if (!user) return null;
 
@@ -121,6 +121,39 @@ export default function CitizenDashboard() {
       month: 'short',
       year: 'numeric',
     });
+  };
+
+  const handleDeleteClick = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this complaint?")) return;
+    try {
+      await deleteDoc(doc(db, 'complaints', id));
+      toast.success("Complaint deleted successfully");
+    } catch (e) {
+      toast.error("Failed to delete complaint");
+    }
+  };
+
+  const handleEditClick = (complaint: Complaint) => {
+    setEditingComplaint(complaint);
+    setEditForm({ title: complaint.title, description: complaint.description });
+  };
+
+  const handleEditSubmit = async () => {
+    if (!editingComplaint) return;
+    setIsUpdating(true);
+    try {
+      await updateDoc(doc(db, 'complaints', editingComplaint.id), {
+        title: editForm.title,
+        description: editForm.description,
+        updatedAt: new Date()
+      });
+      toast.success("Complaint updated");
+      setEditingComplaint(null);
+    } catch (e) {
+      toast.error("Failed to update complaint");
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   return (
@@ -136,8 +169,8 @@ export default function CitizenDashboard() {
               Track and manage your civic complaints
             </p>
           </div>
-          <Button 
-            variant="civic" 
+          <Button
+            variant="civic"
             size="lg"
             onClick={() => navigate('/complaint/new')}
             className="gap-2"
@@ -224,16 +257,15 @@ export default function CitizenDashboard() {
                 return (
                   <div
                     key={complaint.id}
-                    className="flex flex-col md:flex-row md:items-center gap-4 p-4 rounded-xl border border-border hover:bg-secondary/50 transition-colors cursor-pointer group"
-                    onClick={() => navigate(`/complaint/${complaint.id}`)}
+                    className="flex flex-col md:flex-row md:items-center gap-4 p-4 rounded-xl border border-border hover:bg-secondary/50 transition-colors group relative"
                   >
                     {/* Category Icon */}
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary text-2xl flex-shrink-0">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary text-2xl flex-shrink-0 cursor-pointer" onClick={() => navigate(`/complaint/${complaint.id}`)}>
                       {categoryInfo.icon}
                     </div>
 
                     {/* Content */}
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/complaint/${complaint.id}`)}>
                       <div className="flex items-start justify-between gap-4">
                         <div>
                           <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
@@ -248,7 +280,7 @@ export default function CitizenDashboard() {
                           {statusLabel}
                         </span>
                       </div>
-                      
+
                       <div className="flex flex-wrap items-center gap-4 mt-3 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1.5">
                           <MapPin className="h-4 w-4" />
@@ -258,8 +290,42 @@ export default function CitizenDashboard() {
                           <Calendar className="h-4 w-4" />
                           {formatDate(complaint.createdAt)}
                         </span>
+                        {complaint.source === 'voice' && (
+                          <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                            <Mic className="h-3 w-3" />
+                            Voice Report
+                          </span>
+                        )}
                       </div>
                     </div>
+
+                    {/* Actions for Pending Complaints */}
+                    {complaint.status === 'pending' && (
+                      <div className="flex items-center gap-2 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditClick(complaint);
+                          }}
+                        >
+                          <Pencil className="h-3 w-3 mr-1" /> Edit
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteClick(complaint.id);
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
 
                     <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-foreground transition-colors hidden md:block" />
                   </div>
@@ -269,6 +335,38 @@ export default function CitizenDashboard() {
           )}
         </div>
       </div>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editingComplaint} onOpenChange={(open) => !open && setEditingComplaint(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Complaint</DialogTitle>
+            <DialogDescription>Update the details of your complaint.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Title</label>
+              <Input
+                value={editForm.title}
+                onChange={(e) => setEditForm(prev => ({ ...prev, title: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Description</label>
+              <Textarea
+                value={editForm.description}
+                onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingComplaint(null)}>Cancel</Button>
+            <Button onClick={handleEditSubmit} disabled={isUpdating}>
+              {isUpdating ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }

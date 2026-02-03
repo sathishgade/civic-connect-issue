@@ -1,0 +1,65 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- Helper Functions ---
+
+    // Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // specific user check
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Fetch the user's role from their profile document
+    // Note: This costs one document read per evaluation if not cached
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    // Check for specific roles
+    function isAdmin() {
+      return isAuthenticated() && getUserRole() == 'admin';
+    }
+
+    function isEmployee() {
+      return isAuthenticated() && getUserRole() == 'employee';
+    }
+
+    // --- Collection Rules ---
+
+    // Users Collection
+    match /users/{userId} {
+      // Allow users to read and write their own profile
+      // Allow admins to read/write any profile
+      allow get: if isOwner(userId) || isAdmin();
+      
+      // Allow list queries for stats (Field Worker count)
+      allow list: if true; 
+      
+      // Allow creation during registration (users create their own doc)
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      
+      // User can update their own profile. Admin can update anyone (to promote roles).
+      allow update: if request.auth != null && (
+        request.auth.uid == userId ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+      );
+    }
+
+    // Complaints collection
+    match /complaints/{complaintId} {
+      // Secure delete just in case
+      allow delete: if isAdmin();
+    }
+    
+    // NOTE: The Landing Page stats query (counting all complaints/users) 
+    // will fail with these rules for unauthenticated users (Guests). 
+    // To enable public stats, you would need to loosen these rules 
+    // (e.g., 'allow list: if true') or use a dedicated counters document.
+  }
+}
