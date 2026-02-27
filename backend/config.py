@@ -14,7 +14,7 @@ class Settings:
     R2_BUCKET_NAME: str = os.getenv("R2_BUCKET_NAME", "civic-voice-complaints")
     R2_PUBLIC_URL_BASE: str = os.getenv("R2_PUBLIC_URL_BASE", "")
     
-    NVIDIA_API_KEY: str = "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"
+    NVIDIA_API_KEY: str = os.getenv("NVIDIA_API_KEY", "")
     
     # Server
     HOST: str = os.getenv("HOST", "0.0.0.0")
