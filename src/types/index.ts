@@ -16,7 +16,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  phone?: string;
+  phone?: string | null;
   role: UserRole;
   language: 'en' | 'te';
   createdAt: Date;

@@ -67,32 +67,54 @@ export default function NewComplaint() {
   const [recordingTime, setRecordingTime] = useState(0);
   const recordingInterval = useRef<NodeJS.Timeout | null>(null);
 
-  // Conversational Assistant State
-  const [conversationHistory, setConversationHistory] = useState<any[]>([]);
-  const [assistantState, setAssistantState] = useState<'idle' | 'locating' | 'speaking' | 'listening' | 'processing' | 'success'>('idle');
-  const [interimTranscript, setInterimTranscript] = useState(''); // New state for live text
+  // ── Voice Assistant State Machine ──
+  // Steps: 0=locating, 1=category, 2=title, 3=description, 4=priority, 'submitting'='submitting', 'done'='done'
+  type VoiceStep = 0 | 1 | 2 | 3 | 4 | 'submitting' | 'done';
+  const [voiceStep, setVoiceStep] = useState<VoiceStep>(0);
+  const [voiceData, setVoiceData] = useState<{
+    category: ComplaintCategory | '';
+    title: string;
+    description: string;
+    priority: ComplaintPriority;
+  }>({ category: '', title: '', description: '', priority: 'medium' });
+
+  const [ttsState, setTtsState] = useState<'idle' | 'speaking' | 'listening' | 'processing'>('idle');
+  const [interimTranscript, setInterimTranscript] = useState('');
+  const [transcript, setTranscript] = useState('');
   const recognitionRef = useRef<any>(null);
 
   // Refs to hold mutable values for event handlers
-  const assistantStateRef = useRef(assistantState);
-  const latestTranscriptRef = useRef(''); // Holds the accumulating transcript for the current session
+  const ttsStateRef = useRef(ttsState);
+  const latestTranscriptRef = useRef('');
+  // Always points to the latest handleVoiceAnswer — prevents stale closure in recognition handlers
+  const handleVoiceAnswerRef = useRef<(answer: string) => Promise<void>>(async () => { });
+  // Keep voiceStep and voiceData in refs so handleVoiceAnswer always reads current values
+  const voiceStepRef = useRef<VoiceStep>(0);
+  const voiceDataRef = useRef(voiceData);
 
-  // Update refs when state changes
   useEffect(() => {
-    assistantStateRef.current = assistantState;
-  }, [assistantState]);
+    ttsStateRef.current = ttsState;
+  }, [ttsState]);
+
+  useEffect(() => {
+    voiceStepRef.current = voiceStep;
+  }, [voiceStep]);
+
+  useEffect(() => {
+    voiceDataRef.current = voiceData;
+  }, [voiceData]);
 
   // Initialize Speech Recognition (Re-create only when language changes)
   useEffect(() => {
     if (!('webkitSpeechRecognition' in window)) return;
 
     const recognition = new (window as any).webkitSpeechRecognition();
-    recognition.continuous = false; // We want single turns
+    recognition.continuous = false;
     recognition.interimResults = true;
     recognition.lang = selectedLanguage === 'te' ? 'te-IN' : 'en-US';
 
     recognition.onstart = () => {
-      setAssistantState('listening');
+      setTtsState('listening');
       setInterimTranscript('');
       latestTranscriptRef.current = '';
     };
@@ -100,7 +122,6 @@ export default function NewComplaint() {
     recognition.onresult = (event: any) => {
       let finalTranscript = '';
       let interim = '';
-
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         if (event.results[i].isFinal) {
           finalTranscript += event.results[i][0].transcript;
@@ -108,49 +129,29 @@ export default function NewComplaint() {
           interim += event.results[i][0].transcript;
         }
       }
-
       if (interim) {
         setInterimTranscript(interim);
-        // Verify if we should update latestTranscriptRef here? 
-        // Usually final is what counts, but for manual stop we might want interim.
         latestTranscriptRef.current = interim;
       }
-
       if (finalTranscript) {
-        console.log("User said (Final):", finalTranscript);
         setInterimTranscript('');
-        latestTranscriptRef.current = finalTranscript; // Update to final
-        // Trigger turn complete
-        handleUserTurn(finalTranscript);
+        latestTranscriptRef.current = finalTranscript;
+        handleVoiceAnswerRef.current(finalTranscript);
       }
     };
 
     recognition.onerror = (event: any) => {
-      console.error("Speech Error:", event.error);
-      if (event.error === 'no-speech') {
-        if (assistantStateRef.current === 'listening') {
-          setAssistantState('idle');
-        }
-      } else {
-        setAssistantState('idle');
-        // optional: toast.error("Could not hear you.");
-      }
+      console.error('Speech Error:', event.error);
+      if (ttsStateRef.current === 'listening') setTtsState('idle');
     };
 
     recognition.onend = () => {
-      // If we simply stopped but state thinks we are listening, go idle
-      if (assistantStateRef.current === 'listening') {
-        setAssistantState('idle');
-      }
+      if (ttsStateRef.current === 'listening') setTtsState('idle');
     };
 
     recognitionRef.current = recognition;
-
-    // Cleanup: Abort if component unmounts or language changes
-    return () => {
-      recognition.abort();
-    };
-  }, [selectedLanguage]); // Only re-init if language changes
+    return () => { recognition.abort(); };
+  }, [selectedLanguage]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -332,26 +333,16 @@ export default function NewComplaint() {
 
   const startListening = () => {
     if (recognitionRef.current) {
-      try {
-        recognitionRef.current.start();
-      } catch (e) {
-        console.warn("Recognition already started");
-      }
+      try { recognitionRef.current.start(); } catch (e) { console.warn('Recognition already started'); }
     }
   };
 
   const stopListening = () => {
-    // Manual stop by user
     if (recognitionRef.current) {
       recognitionRef.current.stop();
-
-      // Force send whatever we have if it didn't finalize automatically
-      // We give a small buffer for the 'onresult' final event to fire naturally.
-      // If it doesn't fire in 500ms, we force send the interim.
       setTimeout(() => {
-        if (assistantStateRef.current === 'listening' && latestTranscriptRef.current) {
-          console.log("Manual Send (Interim):", latestTranscriptRef.current);
-          handleUserTurn(latestTranscriptRef.current);
+        if (ttsStateRef.current === 'listening' && latestTranscriptRef.current) {
+          handleVoiceAnswerRef.current(latestTranscriptRef.current);
         }
       }, 500);
     }
@@ -360,136 +351,183 @@ export default function NewComplaint() {
   // Load voices
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   useEffect(() => {
-    const loadVoices = () => {
-      const available = window.speechSynthesis.getVoices();
-      setVoices(available);
-    };
+    const loadVoices = () => setVoices(window.speechSynthesis.getVoices());
     loadVoices();
     window.speechSynthesis.onvoiceschanged = loadVoices;
     return () => { window.speechSynthesis.onvoiceschanged = null; };
   }, []);
 
   const speak = (text: string, onEnd?: () => void) => {
-    setAssistantState('speaking');
-
-    // Safety check for empty text
-    if (!text) {
-      if (onEnd) onEnd();
-      return;
-    }
-
+    setTtsState('speaking');
+    if (!text) { if (onEnd) onEnd(); return; }
     const utterance = new SpeechSynthesisUtterance(text);
-    const targetLang = selectedLanguage === 'te' ? 'te-IN' : 'en-US';
-    utterance.lang = targetLang;
-
-    // Try to find a specific voice
+    utterance.lang = selectedLanguage === 'te' ? 'te-IN' : 'en-US';
     if (voices.length > 0) {
       const voice = voices.find(v => v.lang.includes(selectedLanguage === 'te' ? 'te' : 'en'));
-      if (voice) {
-        utterance.voice = voice;
-      } else if (selectedLanguage === 'te') {
-        // Fallback warning if Telugu voice missing
-        toast.info("Telugu voice not found on this device. Using default.");
-      }
+      if (voice) utterance.voice = voice;
+      else if (selectedLanguage === 'te') toast.info('Telugu voice not found on this device. Using default.');
     }
-
-    utterance.onend = () => {
-      if (onEnd) onEnd();
-      else setAssistantState('idle');
-    };
-
-    utterance.onerror = (e) => {
-      console.error("TTS Error:", e);
-      if (onEnd) onEnd();
-    };
-
+    utterance.onend = () => { if (onEnd) onEnd(); else setTtsState('idle'); };
+    utterance.onerror = (e) => { console.error('TTS Error:', e); if (onEnd) onEnd(); };
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(utterance);
   };
 
-  const initAssistant = async (lang: 'en' | 'te') => {
-    setAssistantState('locating');
+  // ── Step prompts ──
+  const STEP_PROMPTS: Record<number, { en: string; te: string }> = {
+    1: {
+      en: 'What type of issue is it? Say Road, Garbage, Drainage, Water, Streetlight, or Other.',
+      te: 'సమస్య రకం ఏమిటి? రోడ్డు, చెత్త, డ్రైనేజి, నీళ్ళు, వీధి దీపాలు, లేదా ఇతర అని చెప్పండి.',
+    },
+    2: {
+      en: 'Please give a short title for the complaint.',
+      te: 'ఫిర్యాదుకు ఒక చిన్న శీర్షిక చెప్పండి.',
+    },
+    3: {
+      en: 'Now describe the issue in more detail.',
+      te: 'ఇప్పుడు సమస్యను వివరంగా వివరించండి.',
+    },
+    4: {
+      en: 'How urgent is it? Say Low, Medium, High, or Critical.',
+      te: 'ఇది ఎంత అర్జెంట్? తక్కువ, మధ్యస్థం, ఎక్కువ, లేదా క్రిటికల్ అని చెప్పండి.',
+    },
+  };
 
-    // Get Location First
+  const parseCategory = (text: string): ComplaintCategory | null => {
+    const t = text.toLowerCase();
+    if (t.includes('road') || t.includes('రోడ్డు')) return 'road';
+    if (t.includes('garbage') || t.includes('waste') || t.includes('trash') || t.includes('చెత్త')) return 'garbage';
+    if (t.includes('drain') || t.includes('sewage') || t.includes('డ్రైనేజి')) return 'drainage';
+    if (t.includes('water') || t.includes('నీళ్ళు') || t.includes('నీరు')) return 'water';
+    if (t.includes('light') || t.includes('lamp') || t.includes('దీపాలు') || t.includes('లైట్')) return 'streetlight';
+    if (t.includes('other') || t.includes('ఇతర')) return 'others';
+    return null;
+  };
+
+  const parsePriority = (text: string): ComplaintPriority => {
+    const t = text.toLowerCase();
+    if (t.includes('critical') || t.includes('క్రిటికల్')) return 'critical';
+    if (t.includes('high') || t.includes('urgent') || t.includes('ఎక్కువ')) return 'high';
+    if (t.includes('low') || t.includes('తక్కువ')) return 'low';
+    return 'medium';
+  };
+
+  // ── Step prompt helper ──
+  const askStep = (step: VoiceStep, lang: 'en' | 'te') => {
+    const prompt = STEP_PROMPTS[step as number];
+    if (!prompt) return;
+    speak(prompt[lang], () => { setTtsState('listening'); startListening(); });
+  };
+
+  // ── Init assistant ──
+  const initAssistant = (lang: 'en' | 'te') => {
+    setVoiceStep(0);
+    setVoiceData({ category: '', title: '', description: '', priority: 'medium' });
+    setTranscript('');
+    setTtsState('processing');
+
     navigator.geolocation.getCurrentPosition(
-      async (position) => {
+      (position) => {
         const { latitude, longitude } = position.coords;
         const addressStr = `Lat: ${latitude.toFixed(4)}, Long: ${longitude.toFixed(4)}`;
         setLocation({ latitude, longitude, address: addressStr });
+        setVoiceStep(1);
 
-        // Initial Greeting
         const greeting = lang === 'en'
-          ? "Hello, I am your assistant. I have located you. Please tell me, what is the issue?"
-          : "నమస్కారం, నేను మీ సహాయకుడిని. మీ స్థానం తీసుకోబడింది. దయచేసి చెప్పండి, సమస్య ఏమిటి?";
+          ? "Hello! I'm your assistant. Your location has been captured. Let's file a complaint together."
+          : "నమస్కారం! నేను మీ సహాయకుడిని. మీ స్థానం నమోదు చేయబడింది. కలిసి ఫిర్యాదు చేద్దాం.";
 
-        setConversationHistory([]);
-
-        speak(greeting, () => {
-          setAssistantState('listening');
-          startListening();
-        });
+        speak(greeting, () => askStep(1, lang));
       },
-      (error) => {
-        toast.error("Location access is required for Voice Assistant.");
+      () => {
+        toast.error('Location access is required for Voice Assistant.');
         setMode('selection');
       }
     );
   };
 
-  const handleUserTurn = async (userText: string) => {
-    setAssistantState('processing');
+  // ── Handle each spoken answer ──
+  const handleVoiceAnswer = async (answer: string) => {
+    setTtsState('processing');
+    setTranscript(answer);
+    const lang = selectedLanguage || 'en';
+    // Read current step and data from refs (avoids stale closure)
+    const currentStep = voiceStepRef.current;
+    const currentData = voiceDataRef.current;
 
-    const newHistory = [...conversationHistory, { role: "user", content: userText }];
-    setConversationHistory(newHistory);
-
-    try {
-      // Call Backend
-      const response = await fetch('http://localhost:8000/api/v1/chat/complaint', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          history: newHistory,
-          location_context: location.address,
-          language: selectedLanguage
-        })
-      });
-
-      if (!response.ok) throw new Error("Assistant API Failed");
-
-      const data = await response.json();
-      const assistantText = data.response_text;
-
-      setConversationHistory(prev => [...prev, { role: "assistant", content: assistantText }]);
-
-      if (data.is_complete && data.extracted_data) {
-        setAssistantState('success');
-        // Auto-fill form and show success or review
-        setFormData({
-          title: data.extracted_data.title || "Voice Report",
-          description: data.extracted_data.description || "Reported via Voice Assistant",
-          category: (data.extracted_data.category as ComplaintCategory) || "others",
-          priority: (data.extracted_data.priority as ComplaintPriority) || "medium"
-        });
-
-        speak(assistantText, () => {
-          setVoiceSuccess(true);
-          // Navigate to dashboard after short delay
-          setTimeout(() => navigate('/dashboard'), 4000);
-        });
-      } else {
-        // Continue Loop
-        speak(assistantText, () => {
-          setAssistantState('listening');
-          startListening();
-        });
+    if (currentStep === 1) {
+      // Category
+      const cat = parseCategory(answer);
+      if (!cat) {
+        const retry = lang === 'en'
+          ? "Sorry, I didn't catch that. Please say Road, Garbage, Drainage, Water, Streetlight, or Other."
+          : 'క్షమించండి, నాకు అర్థం కాలేదు. రోడ్డు, చెత్త, డ్రైనేజి, నీళ్ళు, వీధి దీపాలు, లేదా ఇతర అని చెప్పండి.';
+        speak(retry, () => { setTtsState('listening'); startListening(); });
+        return;
       }
+      setVoiceData(prev => ({ ...prev, category: cat }));
+      setVoiceStep(2);
+      askStep(2, lang);
 
-    } catch (error) {
-      console.error(error);
-      toast.error("Assistant disconnected.");
-      setAssistantState('idle');
+    } else if (currentStep === 2) {
+      // Title
+      const title = answer.trim();
+      setVoiceData(prev => ({ ...prev, title }));
+      setVoiceStep(3);
+      askStep(3, lang);
+
+    } else if (currentStep === 3) {
+      // Description
+      const description = answer.trim();
+      setVoiceData(prev => ({ ...prev, description }));
+      setVoiceStep(4);
+      askStep(4, lang);
+
+    } else if (currentStep === 4) {
+      // Priority → then submit
+      const priority = parsePriority(answer);
+      // Build finalData from the ref to avoid stale voiceData
+      const finalData = { ...currentData, priority };
+      setVoiceData(finalData);
+      setVoiceStep('submitting');
+
+      const confirmMsg = lang === 'en'
+        ? 'Got it! Filing your complaint now.'
+        : 'సరే! ఇప్పుడు మీ ఫిర్యాదు నమోదు చేస్తున్నాను.';
+
+      speak(confirmMsg, async () => {
+        try {
+          await addDoc(collection(db, 'complaints'), {
+            userId: user!.id,
+            title: finalData.title || 'Voice Report',
+            description: finalData.description || 'Reported via Voice Assistant',
+            category: finalData.category || 'others',
+            status: 'pending',
+            priority: finalData.priority,
+            location: {
+              latitude: location.latitude,
+              longitude: location.longitude,
+              address: location.address,
+            },
+            images: [],
+            verificationToken: Math.random().toString(36).substring(2, 8).toUpperCase(),
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          });
+          setVoiceStep('done');
+          toast.success('Complaint submitted successfully!');
+          setTimeout(() => navigate('/dashboard'), 3000);
+        } catch (err) {
+          console.error(err);
+          toast.error('Failed to submit complaint. Please try again.');
+          setVoiceStep(4);
+          setTtsState('idle');
+        }
+      });
     }
   };
+  // Keep the ref current so recognition handlers always call the latest version
+  handleVoiceAnswerRef.current = handleVoiceAnswer;
 
   if (!user) return null;
 
@@ -552,10 +590,7 @@ export default function NewComplaint() {
 
                 <div className="grid grid-cols-1 gap-4">
                   <button
-                    onClick={() => {
-                      setSelectedLanguage('en');
-                      initAssistant('en');
-                    }}
+                    onClick={() => { setSelectedLanguage('en'); initAssistant('en'); }}
                     className="p-6 rounded-2xl border-2 border-border hover:border-primary hover:bg-primary/5 transition-all flex items-center justify-between group"
                   >
                     <span className="text-xl font-semibold">English</span>
@@ -563,10 +598,7 @@ export default function NewComplaint() {
                   </button>
 
                   <button
-                    onClick={() => {
-                      setSelectedLanguage('te');
-                      initAssistant('te');
-                    }}
+                    onClick={() => { setSelectedLanguage('te'); initAssistant('te'); }}
                     className="p-6 rounded-2xl border-2 border-border hover:border-primary hover:bg-primary/5 transition-all flex items-center justify-between group"
                   >
                     <span className="text-xl font-semibold">తెలుగు</span>
@@ -580,100 +612,136 @@ export default function NewComplaint() {
               </div>
             ) : (
               <>
-                {assistantState === 'locating' && (
+                {/* Step progress pills */}
+                {voiceStep !== 'done' && voiceStep !== 'submitting' && (
+                  <div className="flex gap-2 mb-6">
+                    {['Category', 'Title', 'Description', 'Priority'].map((label, i) => {
+                      const step = i + 1;
+                      const done = typeof voiceStep === 'number' && voiceStep > step;
+                      const active = voiceStep === step;
+                      return (
+                        <div key={label} className={`flex-1 text-xs py-1 rounded-full font-medium transition-colors ${done ? 'bg-green-500 text-white' : active ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground'
+                          }`}>
+                          {done ? '✓' : label}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Locating */}
+                {voiceStep === 0 && (
                   <div className="space-y-6 animate-pulse">
                     <MapPin className="h-16 w-16 text-primary mx-auto" />
                     <div>
                       <h2 className="text-2xl font-bold">
-                        {selectedLanguage === 'te' ? "మీ స్థానాన్ని గుర్తిస్తున్నాము..." : "Locating You..."}
+                        {selectedLanguage === 'te' ? 'మీ స్థానాన్ని గుర్తిస్తున్నాము...' : 'Locating You...'}
                       </h2>
                       <p className="text-muted-foreground">
-                        {selectedLanguage === 'te' ? "దయచేసి లొకేషన్ యాక్సెస్ ఇవ్వండి" : "Please allow location access"}
+                        {selectedLanguage === 'te' ? 'దయచేసి లొకేషన్ యాక్సెస్ ఇవ్వండి' : 'Please allow location access'}
                       </p>
                     </div>
                   </div>
                 )}
 
-                {assistantState === 'speaking' && (
+                {/* Speaking */}
+                {ttsState === 'speaking' && voiceStep !== 'done' && (
                   <div className="space-y-8 animate-fade-in">
                     <div className="h-32 w-32 bg-primary/10 rounded-full flex items-center justify-center mx-auto animate-pulse">
                       <Volume2 className="h-16 w-16 text-primary" />
                     </div>
                     <h2 className="text-2xl font-bold">
-                      {selectedLanguage === 'te' ? "సహాయకుడు మాట్లాడుతున్నారు..." : "Assistant Speaking..."}
+                      {selectedLanguage === 'te' ? 'సహాయకుడు మాట్లాడుతున్నారు...' : 'Assistant Speaking...'}
                     </h2>
                   </div>
                 )}
 
-                {(assistantState === 'listening' || assistantState === 'idle') && (
+                {/* Listening / idle */}
+                {(ttsState === 'listening' || ttsState === 'idle') && voiceStep !== 0 && voiceStep !== 'done' && voiceStep !== 'submitting' && (
                   <div className="space-y-8 animate-fade-in">
                     <div className="relative h-40 w-40 mx-auto cursor-pointer" onClick={startListening}>
-                      <div className="absolute inset-0 bg-red-500/20 rounded-full animate-ping" />
+                      <div className={`absolute inset-0 rounded-full ${ttsState === 'listening' ? 'bg-red-500/20 animate-ping' : ''}`} />
                       <div className="relative h-40 w-40 bg-red-500 text-white rounded-full flex items-center justify-center shadow-2xl hover:scale-105 transition-transform">
                         <Mic className="h-20 w-20" />
                       </div>
                     </div>
                     <div>
                       <h2 className="text-2xl font-bold">
-                        {selectedLanguage === 'te' ? "నేను వింటున్నాను..." : "I'm Listening..."}
+                        {ttsState === 'listening'
+                          ? (selectedLanguage === 'te' ? 'నేను వింటున్నాను...' : "I'm Listening...")
+                          : (selectedLanguage === 'te' ? 'మాట్లాడటానికి నొక్కండి' : 'Tap to speak')}
                       </h2>
-                      <p className="text-muted-foreground">
-                        {selectedLanguage === 'te' ? "మాట్లాడటానికి మళ్ళీ నొక్కండి" : "Tap to speak again if needed"}
-                      </p>
+                      {transcript && (
+                        <p className="text-sm text-muted-foreground mt-2 italic">
+                          "{transcript}"
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}
 
-                {assistantState === 'processing' && (
+                {/* Processing */}
+                {ttsState === 'processing' && voiceStep !== 'done' && (
                   <div className="space-y-6 animate-fade-in">
                     <Loader2 className="h-16 w-16 text-primary animate-spin mx-auto" />
                     <h2 className="text-2xl font-bold">
-                      {selectedLanguage === 'te' ? "పరిశీలిస్తున్నాను..." : "Thinking..."}
+                      {selectedLanguage === 'te' ? 'పరిశీలిస్తున్నాను...' : 'Processing...'}
                     </h2>
                   </div>
                 )}
 
-                {assistantState === 'success' && (
+                {/* Submitting */}
+                {voiceStep === 'submitting' && (
+                  <div className="space-y-6 animate-fade-in">
+                    <Loader2 className="h-16 w-16 text-green-500 animate-spin mx-auto" />
+                    <h2 className="text-2xl font-bold">
+                      {selectedLanguage === 'te' ? 'ఫిర్యాదు నమోదు చేస్తున్నాను...' : 'Filing your complaint...'}
+                    </h2>
+                  </div>
+                )}
+
+                {/* Done / Success */}
+                {voiceStep === 'done' && (
                   <div className="space-y-6 animate-scale-in">
                     <CheckCircle2 className="h-24 w-24 text-green-500 mx-auto" />
                     <h2 className="text-3xl font-bold text-foreground">
-                      {selectedLanguage === 'te' ? "ఫిర్యాదు స్వీకరించబడింది!" : "Report Filed!"}
+                      {selectedLanguage === 'te' ? 'ఫిర్యాదు స్వీకరించబడింది!' : 'Complaint Filed!'}
                     </h2>
                     <p className="text-lg text-muted-foreground">
-                      {selectedLanguage === 'te' ? "డాష్‌బోర్డ్‌కు మళ్లిస్తున్నాము..." : "Redirecting to dashboard..."}
+                      {selectedLanguage === 'te' ? 'డాష్‌బోర్డ్‌కు మళ్లిస్తున్నాము...' : 'Redirecting to dashboard...'}
                     </p>
                   </div>
                 )}
 
-                {/* Conversation History */}
-                <div className="mt-12 w-full max-w-lg bg-card border rounded-xl p-4 max-h-48 overflow-y-auto shadow-inner text-left">
-                  {conversationHistory.length === 0 && !interimTranscript ? (
-                    <p className="text-center text-muted-foreground italic">Conversation will appear here...</p>
-                  ) : (
-                    <>
-                      {conversationHistory.map((msg, i) => (
-                        <div key={i} className={`mb-3 ${msg.role === 'assistant' ? 'text-blue-600' : 'text-foreground text-right'}`}>
-                          <span className="text-xs font-bold uppercase block mb-1 opacity-50">{msg.role === 'assistant' ? 'AI Assistant' : 'You'}</span>
-                          <div className={`inline-block px-4 py-2 rounded-lg ${msg.role === 'assistant' ? 'bg-blue-50' : 'bg-secondary'}`}>
-                            {msg.content}
-                          </div>
-                        </div>
-                      ))}
+                {/* Collected fields summary */}
+                {typeof voiceStep === 'number' && voiceStep > 1 && voiceStep !== 0 && (
+                  <div className="mt-8 w-full max-w-lg bg-card border rounded-xl p-4 text-left space-y-2 shadow-inner">
+                    <p className="text-xs font-bold uppercase text-muted-foreground mb-2">
+                      {selectedLanguage === 'te' ? 'సేకరించిన వివరాలు' : 'Collected so far'}
+                    </p>
+                    {voiceData.category && (
+                      <div className="flex gap-2 text-sm"><span className="font-medium">Category:</span><span className="text-primary capitalize">{voiceData.category}</span></div>
+                    )}
+                    {voiceData.title && (
+                      <div className="flex gap-2 text-sm"><span className="font-medium">Title:</span><span>{voiceData.title}</span></div>
+                    )}
+                    {voiceData.description && (
+                      <div className="flex gap-2 text-sm"><span className="font-medium">Description:</span><span className="truncate">{voiceData.description}</span></div>
+                    )}
+                  </div>
+                )}
 
-                      {/* Live Interim Transcript Bubble */}
-                      {interimTranscript && (
-                        <div className="mb-3 text-foreground text-right animate-pulse">
-                          <span className="text-xs font-bold uppercase block mb-1 opacity-50">You (Speaking...)</span>
-                          <div className="inline-block px-4 py-2 rounded-lg bg-secondary/70 border border-primary/20">
-                            {interimTranscript}
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
+                {/* Live interim */}
+                {interimTranscript && (
+                  <div className="mt-4 w-full max-w-lg text-right animate-pulse">
+                    <div className="inline-block px-4 py-2 rounded-lg bg-secondary/70 border border-primary/20 text-sm italic">
+                      {interimTranscript}
+                    </div>
+                  </div>
+                )}
 
-                {(assistantState === 'listening') && (
+                {/* Stop & Send button */}
+                {ttsState === 'listening' && (
                   <div className="mt-4 animate-fade-in">
                     <Button
                       variant="destructive"
@@ -681,7 +749,7 @@ export default function NewComplaint() {
                       className="rounded-full px-8 shadow-lg hover:scale-105 transition-transform"
                       onClick={stopListening}
                     >
-                      {selectedLanguage === 'te' ? "ఆపు / పంపించు" : "Stop & Send"}
+                      {selectedLanguage === 'te' ? 'ఆపు / పంపించు' : 'Stop & Send'}
                       <div className="ml-2 w-3 h-3 bg-white rounded-full animate-pulse" />
                     </Button>
                   </div>
@@ -696,6 +764,7 @@ export default function NewComplaint() {
             )}
           </div>
         )}
+
 
         {mode === 'form' && (
           <div>

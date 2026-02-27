@@ -32,3 +32,4 @@ A smart civic issue reporting platform designed to empower citizens and streamli
     ```bash
     npm run build
     ```
+# civic-connect-issue

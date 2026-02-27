@@ -53,9 +53,31 @@ service cloud.firestore {
 
     // Complaints collection
     match /complaints/{complaintId} {
-      // Secure delete just in case
-      allow delete: if isAdmin();
+      // Citizens: read their own complaints
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin() ||
+        isEmployee()
+      );
+
+      // Anyone authenticated can create a complaint (for voice assistant / form)
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+
+      // Citizens can update their own complaints only if still pending
+      // Admins and employees can update any complaint (to change status, add notes, etc.)
+      allow update: if isAuthenticated() && (
+        (resource.data.userId == request.auth.uid && resource.data.status == 'pending') ||
+        isAdmin() ||
+        isEmployee()
+      );
+
+      // Citizens can delete their own pending complaints; admins can delete any
+      allow delete: if isAuthenticated() && (
+        (resource.data.userId == request.auth.uid && resource.data.status == 'pending') ||
+        isAdmin()
+      );
     }
+
     
     // NOTE: The Landing Page stats query (counting all complaints/users) 
     // will fail with these rules for unauthenticated users (Guests). 
