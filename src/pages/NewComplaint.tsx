@@ -817,6 +817,14 @@ export default function NewComplaint() {
 
         {mode === 'form' && (
           <div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={handleImageUpload}
+            />
             {formStage === 'upload' && (
               <div className="animate-fade-in space-y-6">
                 <Button
@@ -836,14 +844,6 @@ export default function NewComplaint() {
                 </div>
 
                 <div className="card-civic p-8 text-center space-y-6">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={handleImageUpload}
-                  />
 
                   <div className="flex flex-col md:flex-row gap-4 justify-center">
                     <Button
