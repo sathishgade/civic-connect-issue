@@ -116,35 +116,6 @@ async def analyze_image_endpoint(image: UploadFile = File(...)):
         # Read file
         contents = await image.read()
         
-        # Resize image if too large (using Pillow)
-        try:
-            from PIL import Image
-            import io
-            
-            img = Image.open(io.BytesIO(contents))
-            
-            # resizing to max 1024 on longest side
-            max_size = 1024
-            if max(img.size) > max_size:
-                ratio = max_size / max(img.size)
-                new_size = (int(img.width * ratio), int(img.height * ratio))
-                img = img.resize(new_size, Image.Resampling.LANCZOS)
-                
-                # Save back to bytes
-                buffer = io.BytesIO()
-                # Convert to RGB if RGBA/P (JPEGs don't support alpha)
-                if img.mode in ("RGBA", "P"):
-                    img = img.convert("RGB")
-                    
-                img.save(buffer, format="JPEG", quality=85)
-                contents = buffer.getvalue()
-                print(f"Image resized to {new_size}")
-                
-        except ImportError:
-            print("Pillow not installed, skipping resize. Install with: pip install Pillow")
-        except Exception as e:
-             print(f"Image resize failed: {e}")
-
         import base64
         image_b64 = base64.b64encode(contents).decode("utf-8")
         

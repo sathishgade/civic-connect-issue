@@ -102,12 +102,12 @@ class AIService:
 
     async def analyze_image(self, image_b64: str) -> dict:
         """
-        Analyzes an image using NVIDIA Phi-4 Multimodal to extract complaint details.
+        Analyzes an image using NVIDIA Llama-3.2-11b-vision-instruct to extract complaint details.
         """
         system_prompt = """
         Analyze this image of a civic issue. 
         Extract the following details in JSON format:
-        1. category: (road, garbage, drainage, water, streetlight,other)
+        1. category: (road, garbage, drainage, water, streetlight, streetlight, other)
         2. title: A short, clear title.
         3. description: A detailed description of the visual issue.
         4. priority: (low, medium, high, critical)
@@ -130,10 +130,29 @@ class AIService:
             }
         ]
 
-        print(f"Sending image analysis request to NVIDIA API...") # Debug
-        result = await self._call_nvidia_api(messages, max_tokens=512)
+        print(f"Sending image analysis request to NVIDIA NIM (Llama-3.2 Vision)...")
         
-        print(f"Raw AI Response: {result}") # Debug
+        # Use a vision-specific model name
+        vision_payload = {
+            "model": "meta/llama-3.2-11b-vision-instruct",
+            "messages": messages,
+            "max_tokens": 1024,
+            "temperature": 0.2,
+            "top_p": 0.7,
+            "stream": False
+        }
+
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(self.invoke_url, headers=self.headers, json=vision_payload, timeout=25.0)
+                response.raise_for_status()
+                data = response.json()
+                result = data['choices'][0]['message']['content']
+            except Exception as e:
+                print(f"Vision API Call Failed: {e}")
+                result = None
+
+        print(f"Raw AI Response: {result}")
 
         if result:
             # Try to find JSON content if it's wrapped in markdown or just messy

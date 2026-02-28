@@ -391,40 +391,52 @@ export default function NewComplaint() {
       const formDataUpload = new FormData();
       formDataUpload.append('image', file);
 
-      // Try to hit the backend
-      const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      // Try to hit the backend with a timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 35000); // 35 second timeout
+
       try {
+        console.log(`Sending analysis request to ${apiBaseUrl}/api/v1/analyze-image...`);
         const response = await fetch(`${apiBaseUrl}/api/v1/analyze-image`, {
           method: 'POST',
-          body: formDataUpload
+          body: formDataUpload,
+          signal: controller.signal
         });
+        clearTimeout(timeoutId);
 
         if (response.ok) {
           const data = await response.json();
+          console.log('Analysis result:', data);
           setFormData(prev => ({
             ...prev,
-            title: data.title,
-            description: data.description,
-            category: data.category as ComplaintCategory,
-            priority: data.priority as ComplaintPriority
+            title: data.title || prev.title,
+            description: data.description || prev.description,
+            category: (data.category as ComplaintCategory) || prev.category,
+            priority: (data.priority as ComplaintPriority) || prev.priority
           }));
           toast.success("Form autofilled from image!");
           setFormStage('details');
         } else {
-          throw new Error("Backend failed");
+          const errorText = await response.text();
+          console.error('Analysis failed status:', response.status, errorText);
+          throw new Error("Backend failed: " + response.status);
         }
-      } catch (err) {
-        console.warn("Backend unavailable, using mock AI", err);
-        // Fallback simulation
-        await new Promise(resolve => setTimeout(resolve, 2000));
+      } catch (err: any) {
+        clearTimeout(timeoutId);
+        if (err.name === 'AbortError') {
+          console.warn("Analysis timed out, using fallback");
+        } else {
+          console.warn("Backend analysis error:", err);
+        }
+        // Fallback simulation (Instant for better UX if backend fails)
         setFormData(prev => ({
           ...prev,
-          title: "Garbage Pile on Street Corner",
-          description: "Large pile of uncollected garbage blocking the pedestrian path. It appears to be decomposing.",
-          category: 'garbage',
+          title: "Civic Issue Detected",
+          description: "This issue was detected from the uploaded photo. Please verify these details.",
+          category: 'others',
           priority: 'medium'
         }));
-        toast.success("Autofilled (Simulation Mode)");
+        toast.info("Could not auto-analyze image. Please fill details manually.");
         setFormStage('details');
       }
     } catch (error) {
