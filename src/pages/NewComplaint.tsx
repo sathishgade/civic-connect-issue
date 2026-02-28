@@ -473,15 +473,16 @@ export default function NewComplaint() {
     return () => { window.speechSynthesis.onvoiceschanged = null; };
   }, []);
 
-  const speak = (text: string, onEnd?: () => void) => {
+  const speak = (text: string, onEnd?: () => void, lang?: 'en' | 'te') => {
     setTtsState('speaking');
     if (!text) { if (onEnd) onEnd(); return; }
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = selectedLanguage === 'te' ? 'te-IN' : 'en-US';
+    const utteranceLang = lang || selectedLanguage || 'en';
+    utterance.lang = utteranceLang === 'te' ? 'te-IN' : 'en-US';
     if (voices.length > 0) {
-      const voice = voices.find(v => v.lang.includes(selectedLanguage === 'te' ? 'te' : 'en'));
+      const voice = voices.find(v => v.lang.includes(utteranceLang === 'te' ? 'te' : 'en'));
       if (voice) utterance.voice = voice;
-      else if (selectedLanguage === 'te') toast.info('Telugu voice not found on this device. Using default.');
+      else if (utteranceLang === 'te') toast.info('Telugu voice not found on this device. Using default.');
     }
     utterance.onend = () => { if (onEnd) onEnd(); else setTtsState('idle'); };
     utterance.onerror = (e) => { console.error('TTS Error:', e); if (onEnd) onEnd(); };
@@ -532,7 +533,7 @@ export default function NewComplaint() {
   const askStep = (step: VoiceStep, lang: 'en' | 'te') => {
     const prompt = STEP_PROMPTS[step as number];
     if (!prompt) return;
-    speak(prompt[lang], () => { setTtsState('listening'); startListening(); });
+    speak(prompt[lang], () => { setTtsState('listening'); startListening(); }, lang);
   };
 
   // ── Init assistant ──
@@ -542,6 +543,12 @@ export default function NewComplaint() {
     setTranscript('');
     setTtsState('processing');
 
+    const preGreeting = lang === 'en'
+      ? "Please wait a moment while I capture your location."
+      : "దయచేసి మీ స్థానాన్ని గుర్తిస్తున్నాను, ఒక క్షణం వేచి ఉండండి.";
+
+    speak(preGreeting, undefined, lang);
+
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
@@ -550,10 +557,10 @@ export default function NewComplaint() {
         setVoiceStep(1);
 
         const greeting = lang === 'en'
-          ? "Hello! I'm your assistant. Your location has been captured. Let's file a complaint together."
+          ? "Hello! I'm your assistant. Your location has beeen captured. Let's file a complaint together."
           : "నమస్కారం! నేను మీ సహాయకుడిని. మీ స్థానం నమోదు చేయబడింది. కలిసి ఫిర్యాదు చేద్దాం.";
 
-        speak(greeting, () => askStep(1, lang));
+        speak(greeting, () => askStep(1, lang), lang);
       },
       () => {
         toast.error('Location access is required for Voice Assistant.');
@@ -578,7 +585,7 @@ export default function NewComplaint() {
         const retry = lang === 'en'
           ? "Sorry, I didn't catch that. Please say Road, Garbage, Drainage, Water, Streetlight, or Other."
           : 'క్షమించండి, నాకు అర్థం కాలేదు. రోడ్డు, చెత్త, డ్రైనేజి, నీళ్ళు, వీధి దీపాలు, లేదా ఇతర అని చెప్పండి.';
-        speak(retry, () => { setTtsState('listening'); startListening(); });
+        speak(retry, () => { setTtsState('listening'); startListening(); }, lang);
         return;
       }
       setVoiceData(prev => ({ ...prev, category: cat }));
@@ -642,7 +649,7 @@ export default function NewComplaint() {
           setVoiceStep(4);
           setTtsState('idle');
         }
-      });
+      }, lang);
     }
   };
   // Keep the ref current so recognition handlers always call the latest version
