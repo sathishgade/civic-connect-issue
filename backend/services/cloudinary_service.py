@@ -1,3 +1,4 @@
+import anyio
 import cloudinary
 import cloudinary.uploader
 from config import settings
@@ -19,7 +20,6 @@ class CloudinaryService:
         Includes automatic compression and optimization in a non-blocking thread.
         """
         try:
-            import anyio
             content = await file.read()
             await file.seek(0)
 

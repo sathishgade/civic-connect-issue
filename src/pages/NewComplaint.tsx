@@ -247,7 +247,9 @@ export default function NewComplaint() {
           return image;
         }
 
-        const blob = await dataURLtoBlob(image);
+        // Compress image before upload
+        console.log('Compressing image...');
+        const blob = await compressImage(image);
         const file = new File([blob], "image.jpg", { type: "image/jpeg" });
         const formDataUpload = new FormData();
         formDataUpload.append('image', file);
@@ -336,6 +338,45 @@ export default function NewComplaint() {
     return await res.blob();
   };
 
+  // Client-side image compression
+  const compressImage = (dataUrl: string): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.src = dataUrl;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        // Max dimension 1280px
+        const MAX_SIZE = 1280;
+        if (width > height) {
+          if (width > MAX_SIZE) {
+            height *= MAX_SIZE / width;
+            width = MAX_SIZE;
+          }
+        } else {
+          if (height > MAX_SIZE) {
+            width *= MAX_SIZE / height;
+            height = MAX_SIZE;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        // Compress to JPEG with 0.7 quality
+        canvas.toBlob((blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error('Canvas toBlob failed'));
+        }, 'image/jpeg', 0.7);
+      };
+      img.onerror = (e) => reject(e);
+    });
+  };
+
   const analyzeImageAndAutofill = async () => {
     if (images.length === 0) return;
 
@@ -343,7 +384,8 @@ export default function NewComplaint() {
     const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
     try {
-      const blob = await dataURLtoBlob(images[0]);
+      console.log('Compressing image for analysis...');
+      const blob = await compressImage(images[0]);
       const file = new File([blob], "image.jpg", { type: "image/jpeg" });
 
       const formDataUpload = new FormData();
