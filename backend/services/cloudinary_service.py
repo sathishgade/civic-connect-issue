@@ -16,23 +16,22 @@ class CloudinaryService:
     async def upload_image(self, file: UploadFile) -> str:
         """
         Uploads an image to Cloudinary and returns the URL.
-        Includes automatic compression and optimization.
+        Includes automatic compression and optimization in a non-blocking thread.
         """
         try:
-            # Read file content
+            import anyio
             content = await file.read()
-            
-            # Reset file pointer for any subsequent reads if necessary
             await file.seek(0)
 
-            # Upload to Cloudinary with optimization
-            # 'auto' for fetch_format and quality ensures compression
-            upload_result = cloudinary.uploader.upload(
-                content,
-                folder="civic-connect/complaints",
-                resource_type="image",
-                fetch_format="auto",
-                quality="auto"
+            # run_sync ensures this CPU/IO bound sync call doesn't block the event loop
+            upload_result = await anyio.to_thread.run_sync(
+                lambda: cloudinary.uploader.upload(
+                    content,
+                    folder="civic-connect/complaints",
+                    resource_type="image",
+                    fetch_format="auto",
+                    quality="auto"
+                )
             )
             
             return upload_result.get("secure_url")

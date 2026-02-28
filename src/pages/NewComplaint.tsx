@@ -231,14 +231,15 @@ export default function NewComplaint() {
     }
 
     setIsLoading(true);
+    const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
     try {
-      // 1. Upload images to Cloudinary via backend
-      const uploadedImageUrls: string[] = [];
-      for (const image of images) {
+      // 1. Upload images to Cloudinary in parallel via backend
+      toast.info(`Uploading ${images.length} image(s)...`);
+
+      const uploadPromises = images.map(async (image) => {
         if (image.startsWith('http')) {
-          uploadedImageUrls.push(image);
-          continue;
+          return image;
         }
 
         const blob = dataURLtoBlob(image);
@@ -246,16 +247,18 @@ export default function NewComplaint() {
         const formDataUpload = new FormData();
         formDataUpload.append('image', file);
 
-        const response = await fetch('http://localhost:8000/api/v1/upload-image', {
+        const response = await fetch(`${apiBaseUrl}/api/v1/upload-image`, {
           method: 'POST',
           body: formDataUpload
         });
 
-        if (response.ok) {
-          const data = await response.json();
-          uploadedImageUrls.push(data.url);
-        }
-      }
+        if (!response.ok) throw new Error("Image upload failed");
+
+        const data = await response.json();
+        return data.url;
+      });
+
+      const uploadedImageUrls = await Promise.all(uploadPromises);
 
       const googleMapsLink = `https://www.google.com/maps?q=${location.latitude},${location.longitude}`;
 
@@ -315,9 +318,10 @@ export default function NewComplaint() {
       const formDataUpload = new FormData();
       formDataUpload.append('image', file);
 
-      // Try to hit the local backend first
+      // Try to hit the backend
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
       try {
-        const response = await fetch('http://localhost:8000/api/v1/analyze-image', {
+        const response = await fetch(`${apiBaseUrl}/api/v1/analyze-image`, {
           method: 'POST',
           body: formDataUpload
         });
