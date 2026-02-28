@@ -18,14 +18,15 @@ const translations: Translations = {
   'nav.login': { en: 'Login', te: 'లాగిన్' },
   'nav.register': { en: 'Register', te: 'నమోదు' },
   'nav.logout': { en: 'Logout', te: 'లాగ్ అవుట్' },
-  
+  'nav.voiceCall': { en: 'Voice Call', te: 'వాయిస్ కాల్' },
+
   // Landing Page
   'landing.title': { en: 'Smart Civic Issue Reporting', te: 'స్మార్ట్ సివిక్ సమస్య నివేదన' },
   'landing.subtitle': { en: 'Report local issues easily. Get them resolved faster.', te: 'స్థానిక సమస్యలను సులభంగా నివేదించండి. వాటిని వేగంగా పరిష్కరించండి.' },
   'landing.cta': { en: 'Report an Issue', te: 'సమస్యను నివేదించండి' },
   'landing.features': { en: 'Features', te: 'ఫీచర్లు' },
   'landing.howItWorks': { en: 'How It Works', te: 'ఇది ఎలా పనిచేస్తుంది' },
-  
+
   // Auth
   'auth.email': { en: 'Email Address', te: 'ఇమెయిల్ చిరునామా' },
   'auth.password': { en: 'Password', te: 'పాస్‌వర్డ్' },
@@ -35,16 +36,17 @@ const translations: Translations = {
   'auth.registerBtn': { en: 'Create Account', te: 'ఖాతా సృష్టించు' },
   'auth.noAccount': { en: "Don't have an account?", te: 'ఖాతా లేదా?' },
   'auth.hasAccount': { en: 'Already have an account?', te: 'ఇప్పటికే ఖాతా ఉందా?' },
-  
+
   // Complaints
   'complaint.title': { en: 'Issue Title', te: 'సమస్య శీర్షిక' },
   'complaint.description': { en: 'Description', te: 'వివరణ' },
   'complaint.category': { en: 'Category', te: 'వర్గం' },
   'complaint.location': { en: 'Location', te: 'స్థానం' },
+  'complaint.images': { en: 'Images', te: 'చిత్రాలు' },
   'complaint.uploadImage': { en: 'Upload Image', te: 'చిత్రం అప్‌లోడ్ చేయండి' },
   'complaint.submit': { en: 'Submit Complaint', te: 'ఫిర్యాదు సమర్పించండి' },
   'complaint.track': { en: 'Track Status', te: 'స్థితిని ట్రాక్ చేయండి' },
-  
+
   // Dashboard
   'dashboard.welcome': { en: 'Welcome', te: 'స్వాగతం' },
   'dashboard.totalComplaints': { en: 'Total Complaints', te: 'మొత్తం ఫిర్యాదులు' },
@@ -52,7 +54,7 @@ const translations: Translations = {
   'dashboard.inProgress': { en: 'In Progress', te: 'పురోగతిలో' },
   'dashboard.resolved': { en: 'Resolved', te: 'పరిష్కరించబడింది' },
   'dashboard.recentComplaints': { en: 'Recent Complaints', te: 'ఇటీవలి ఫిర్యాదులు' },
-  
+
   // Common
   'common.loading': { en: 'Loading...', te: 'లోడ్ అవుతోంది...' },
   'common.error': { en: 'An error occurred', te: 'లోపం సంభవించింది' },
@@ -64,7 +66,7 @@ const translations: Translations = {
   'common.view': { en: 'View', te: 'చూడండి' },
   'common.search': { en: 'Search', te: 'వెతకండి' },
   'common.filter': { en: 'Filter', te: 'ఫిల్టర్' },
-  
+
   // Features
   'feature.form.title': { en: 'Easy Form', te: 'సులభ ఫారం' },
   'feature.form.desc': { en: 'Fill a simple form to report issues', te: 'సమస్యలను నివేదించడానికి సులభమైన ఫారం నింపండి' },

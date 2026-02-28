@@ -575,31 +575,50 @@ export default function NewComplaint() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <button
-                onClick={() => setMode('form')}
-                className="flex flex-col items-center justify-center p-8 rounded-2xl border-2 border-border hover:border-primary hover:bg-primary/5 transition-all group"
+                onClick={() => {
+                  setMode('form');
+                  setFormStage('details');
+                }}
+                className="flex flex-col items-center justify-center p-8 rounded-2xl border-2 border-primary/50 bg-primary/5 hover:bg-primary/10 transition-all group shadow-sm"
               >
-                <div className="h-16 w-16 rounded-full bg-secondary flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <div className="h-16 w-16 rounded-full bg-primary/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                   <FileText className="h-8 w-8 text-primary" />
                 </div>
-                <h3 className="text-lg font-semibold text-foreground">Fill Form</h3>
+                <h3 className="text-lg font-semibold text-foreground underline decoration-primary/30 underline-offset-4">Manual Report</h3>
                 <p className="text-sm text-muted-foreground text-center mt-2">
-                  Enter details, upload photos, and set location manually
+                  Fill details manually. Recommended for quick reporting.
+                </p>
+              </button>
+
+              <button
+                onClick={() => {
+                  setMode('form');
+                  setFormStage('upload');
+                }}
+                className="flex flex-col items-center justify-center p-8 rounded-2xl border-2 border-border hover:border-accent hover:bg-accent/5 transition-all group"
+              >
+                <div className="h-16 w-16 rounded-full bg-secondary flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <Sparkles className="h-8 w-8 text-accent" />
+                </div>
+                <h3 className="text-lg font-semibold text-foreground">AI Smart Report</h3>
+                <p className="text-sm text-muted-foreground text-center mt-2">
+                  Upload a photo and let AI fill the details for you.
                 </p>
               </button>
 
               <button
                 onClick={() => {
                   setMode('call');
-                  setSelectedLanguage(null); // Reset language selection
+                  setSelectedLanguage(null);
                 }}
                 className="flex flex-col items-center justify-center p-8 rounded-2xl border-2 border-border hover:border-primary hover:bg-primary/5 transition-all group"
               >
                 <div className="h-16 w-16 rounded-full bg-secondary flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                   <Mic className="h-8 w-8 text-primary" />
                 </div>
-                <h3 className="text-lg font-semibold text-foreground">Voice Call</h3>
+                <h3 className="text-lg font-semibold text-foreground">{t('nav.voiceCall')}</h3>
                 <p className="text-sm text-muted-foreground text-center mt-2">
                   Speak to our AI Assistant to report instantly
                 </p>
@@ -935,6 +954,32 @@ export default function NewComplaint() {
 
                 <div className="card-civic">
                   <form onSubmit={handleSubmit} className="space-y-6">
+                    <div className="space-y-2">
+                      <Label>{t('complaint.images')} (Optional)</Label>
+                      <div className="flex flex-wrap gap-4 items-center">
+                        {images.map((image, index) => (
+                          <div key={index} className="relative h-20 w-20 group">
+                            <img src={image} className="h-full w-full object-cover rounded-lg border shadow-sm" />
+                            <button
+                              type="button"
+                              onClick={() => removeImage(index)}
+                              className="absolute -top-2 -right-2 bg-destructive text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="h-20 w-20 border-2 border-dashed border-muted-foreground/30 rounded-lg flex flex-col items-center justify-center gap-1 hover:border-primary/50 hover:bg-primary/5 transition-all text-muted-foreground"
+                        >
+                          <Upload className="h-5 w-5" />
+                          <span className="text-[10px] font-medium">Add Photo</span>
+                        </button>
+                      </div>
+                    </div>
+
                     <div className="space-y-2">
                       <Label htmlFor="category">{t('complaint.category')} *</Label>
                       <Select
