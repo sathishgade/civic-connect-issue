@@ -247,26 +247,51 @@ export default function NewComplaint() {
           return image;
         }
 
-        const blob = dataURLtoBlob(image);
+        const blob = await dataURLtoBlob(image);
         const file = new File([blob], "image.jpg", { type: "image/jpeg" });
         const formDataUpload = new FormData();
         formDataUpload.append('image', file);
 
-        const response = await fetch(`${apiBaseUrl}/api/v1/upload-image`, {
-          method: 'POST',
-          body: formDataUpload
-        });
+        console.log(`Uploading image to ${apiBaseUrl}/api/v1/upload-image...`);
 
-        if (!response.ok) throw new Error("Image upload failed");
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 1 minute timeout
 
-        const data = await response.json();
+        try {
+          const response = await fetch(`${apiBaseUrl}/api/v1/upload-image`, {
+            method: 'POST',
+            body: formDataUpload,
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
 
-        completedCount++;
-        if (totalToUpload > 0) {
-          setUploadProgress((completedCount / totalToUpload) * 100);
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Upload failed:', response.status, errorText);
+            throw new Error(`Server returned ${response.status}: ${errorText || 'Internal Error'}`);
+          }
+
+          const data = await response.json();
+          console.log('Upload success:', data.url);
+
+          completedCount++;
+          if (totalToUpload > 0) {
+            const progress = (completedCount / totalToUpload) * 100;
+            setUploadProgress(progress);
+            console.log(`Upload progress: ${progress}%`);
+          }
+
+          return data.url;
+        } catch (err: any) {
+          clearTimeout(timeoutId);
+          if (err.name === 'AbortError') {
+            throw new Error("Upload timed out. Please check your connection or backend status.");
+          }
+          if (err.message.includes('Failed to fetch')) {
+            throw new Error(`Cannot connect to backend at ${apiBaseUrl}. Ensure the server is running.`);
+          }
+          throw err;
         }
-
-        return data.url;
       });
 
       const uploadedImageUrls = await Promise.all(uploadPromises);
@@ -297,34 +322,28 @@ export default function NewComplaint() {
 
       toast.success('Complaint submitted successfully!');
       navigate('/dashboard');
-    } catch (error) {
-      console.error("Error adding document: ", error);
-      toast.error('Failed to submit complaint. Please try again.');
+    } catch (error: any) {
+      console.error("Submission error details:", error);
+      toast.error(error.message || 'Failed to submit complaint. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
   // Helper to convert data URL to Blob
-  const dataURLtoBlob = (dataurl: string) => {
-    const arr = dataurl.split(',');
-    const mimeMatch = arr[0].match(/:(.*?);/);
-    const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while (n--) {
-      u8arr[n] = bstr.charCodeAt(n);
-    }
-    return new Blob([u8arr], { type: mime });
+  const dataURLtoBlob = async (dataurl: string) => {
+    const res = await fetch(dataurl);
+    return await res.blob();
   };
 
   const analyzeImageAndAutofill = async () => {
     if (images.length === 0) return;
 
     setIsAnalyzing(true);
+    const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
     try {
-      const blob = dataURLtoBlob(images[0]);
+      const blob = await dataURLtoBlob(images[0]);
       const file = new File([blob], "image.jpg", { type: "image/jpeg" });
 
       const formDataUpload = new FormData();
