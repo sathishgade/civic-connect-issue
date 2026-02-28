@@ -104,6 +104,15 @@ class AIService:
         """
         Analyzes an image using NVIDIA Llama-3.2-11b-vision-instruct to extract complaint details.
         """
+        if not self.api_key:
+            print("CRITICAL: NVIDIA_API_KEY is missing from environment variables.")
+            return {
+                "category": "others",
+                "title": "Config Error",
+                "description": "NVIDIA_API_KEY is not configured in the backend environment. Please add it to your .env file.",
+                "priority": "medium"
+            }
+
         system_prompt = """
         Analyze this image of a civic issue. 
         Extract the following details in JSON format:
@@ -132,7 +141,7 @@ class AIService:
 
         print(f"Sending image analysis request to NVIDIA NIM (Llama-3.2 Vision)...")
         
-        # Use a vision-specific model name
+        # Using the standard vision NIM endpoint format
         vision_payload = {
             "model": "meta/llama-3.2-11b-vision-instruct",
             "messages": messages,
@@ -145,6 +154,15 @@ class AIService:
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.post(self.invoke_url, headers=self.headers, json=vision_payload, timeout=25.0)
+                if response.status_code == 401:
+                    print(f"Vision API Error: 401 Unauthorized. Check if your NVIDIA_API_KEY is valid.")
+                    return {
+                        "category": "others",
+                        "title": "Auth Error",
+                        "description": "NVIDIA_API_KEY is invalid or unauthorized. Please check your NVIDIA account.",
+                        "priority": "medium"
+                    }
+                
                 response.raise_for_status()
                 data = response.json()
                 result = data['choices'][0]['message']['content']
