@@ -285,6 +285,17 @@ export default function CitizenDashboard() {
                         <span className="flex items-center gap-1.5">
                           <MapPin className="h-4 w-4" />
                           {complaint.location.area || complaint.location.address}
+                          {complaint.location.googleMapsLink && (
+                            <a
+                              href={complaint.location.googleMapsLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline ml-1 text-xs"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              (View Map)
+                            </a>
+                          )}
                         </span>
                         <span className="flex items-center gap-1.5">
                           <Calendar className="h-4 w-4" />

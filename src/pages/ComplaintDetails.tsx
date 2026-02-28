@@ -118,6 +118,16 @@ export default function ComplaintDetails() {
                                 <div className="flex items-center gap-2">
                                     <MapPin className="h-4 w-4" />
                                     <span>{complaint.location.address}</span>
+                                    {complaint.location.googleMapsLink && (
+                                        <a
+                                            href={complaint.location.googleMapsLink}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-primary hover:underline ml-1 text-xs"
+                                        >
+                                            (View on Google Maps)
+                                        </a>
+                                    )}
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Calendar className="h-4 w-4" />

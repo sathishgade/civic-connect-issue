@@ -233,19 +233,46 @@ export default function NewComplaint() {
     setIsLoading(true);
 
     try {
+      // 1. Upload images to Cloudinary via backend
+      const uploadedImageUrls: string[] = [];
+      for (const image of images) {
+        if (image.startsWith('http')) {
+          uploadedImageUrls.push(image);
+          continue;
+        }
+
+        const blob = dataURLtoBlob(image);
+        const file = new File([blob], "image.jpg", { type: "image/jpeg" });
+        const formDataUpload = new FormData();
+        formDataUpload.append('image', file);
+
+        const response = await fetch('http://localhost:8000/api/v1/upload-image', {
+          method: 'POST',
+          body: formDataUpload
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          uploadedImageUrls.push(data.url);
+        }
+      }
+
+      const googleMapsLink = `https://www.google.com/maps?q=${location.latitude},${location.longitude}`;
+
       const complaintData = {
         userId: user!.id,
         title: formData.title,
         description: formData.description,
         category: formData.category,
         status: 'pending',
-        priority: 'medium',
+        priority: formData.priority || 'medium',
         location: {
           latitude: location.latitude,
           longitude: location.longitude,
           address: location.address,
+          googleMapsLink: googleMapsLink,
         },
-        images: images,
+        images: uploadedImageUrls,
         verificationToken: Math.random().toString(36).substring(2, 8).toUpperCase(),
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
@@ -497,6 +524,8 @@ export default function NewComplaint() {
 
       speak(confirmMsg, async () => {
         try {
+          const googleMapsLink = `https://www.google.com/maps?q=${location.latitude},${location.longitude}`;
+
           await addDoc(collection(db, 'complaints'), {
             userId: user!.id,
             title: finalData.title || 'Voice Report',
@@ -508,6 +537,7 @@ export default function NewComplaint() {
               latitude: location.latitude,
               longitude: location.longitude,
               address: location.address,
+              googleMapsLink: googleMapsLink,
             },
             images: [],
             verificationToken: Math.random().toString(36).substring(2, 8).toUpperCase(),

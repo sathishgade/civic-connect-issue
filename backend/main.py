@@ -5,6 +5,7 @@ from typing import Optional
 import json
 from services.r2_service import r2_service
 from services.ai_service import ai_service
+from services.cloudinary_service import cloudinary_service
 import firebase_admin
 from firebase_admin import credentials, firestore
 from config import settings
@@ -151,6 +152,18 @@ async def analyze_image_endpoint(image: UploadFile = File(...)):
         return result
     except Exception as e:
         print(f"Error analyzing image: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/upload-image")
+async def upload_image_endpoint(image: UploadFile = File(...)):
+    """
+    Endpoint for individual image uploads to Cloudinary.
+    """
+    try:
+        url = await cloudinary_service.upload_image(image)
+        return {"url": url}
+    except Exception as e:
+        print(f"Error in upload-image endpoint: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 class ChatRequest(BaseModel):

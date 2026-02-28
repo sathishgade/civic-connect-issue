@@ -29,6 +29,7 @@ export interface Location {
   area?: string;
   city?: string;
   pincode?: string;
+  googleMapsLink?: string;
 }
 
 export interface Complaint {
