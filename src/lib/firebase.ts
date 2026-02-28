@@ -3,12 +3,12 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-    apiKey: "AIzaSyCpKqaL60EDeWcfa2CNO4yZhAXj0lK-0QM",
-    authDomain: "civic-issue-reporting-b2255.firebaseapp.com",
-    projectId: "civic-issue-reporting-b2255",
-    storageBucket: "civic-issue-reporting-b2255.firebasestorage.app",
-    messagingSenderId: "623590505991",
-    appId: "1:623590505991:web:314558a5b21360f969b4a2"
+    apiKey: "AIzaSyArvpN7gJCIO1s4q-aO4_g7Iccyl0uR5VU",
+    authDomain: "smart-civic-issue.firebaseapp.com",
+    projectId: "smart-civic-issue",
+    storageBucket: "smart-civic-issue.firebasestorage.app",
+    messagingSenderId: "348447613316",
+    appId: "1:348447613316:web:fbb8a66aa19f1fcf097dd1"
 };
 
 const app = initializeApp(firebaseConfig);
