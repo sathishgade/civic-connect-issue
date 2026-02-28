@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Progress } from '@/components/ui/progress';
 import { CATEGORY_LABELS, ComplaintCategory, ComplaintPriority } from '@/types';
 import { toast } from 'sonner';
 import { db } from '@/lib/firebase';
@@ -40,6 +41,7 @@ export default function NewComplaint() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isLoading, setIsLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -231,11 +233,14 @@ export default function NewComplaint() {
     }
 
     setIsLoading(true);
+    setUploadProgress(0);
     const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
     try {
       // 1. Upload images to Cloudinary in parallel via backend
-      toast.info(`Uploading ${images.length} image(s)...`);
+      let completedCount = 0;
+      const imagesToUpload = images.filter(img => !img.startsWith('http'));
+      const totalToUpload = imagesToUpload.length;
 
       const uploadPromises = images.map(async (image) => {
         if (image.startsWith('http')) {
@@ -255,10 +260,17 @@ export default function NewComplaint() {
         if (!response.ok) throw new Error("Image upload failed");
 
         const data = await response.json();
+
+        completedCount++;
+        if (totalToUpload > 0) {
+          setUploadProgress((completedCount / totalToUpload) * 100);
+        }
+
         return data.url;
       });
 
       const uploadedImageUrls = await Promise.all(uploadPromises);
+      setUploadProgress(100);
 
       const googleMapsLink = `https://www.google.com/maps?q=${location.latitude},${location.longitude}`;
 
@@ -627,6 +639,27 @@ export default function NewComplaint() {
                   Speak to our AI Assistant to report instantly
                 </p>
               </button>
+            </div>
+          </div>
+        )}
+
+        {isLoading && (
+          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="max-w-md w-full bg-card border rounded-2xl p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Submitting Complaint</h3>
+                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {images.length > 0 && uploadProgress < 100
+                    ? `Uploading images... ${Math.round(uploadProgress)}%`
+                    : 'Finalizing your complaint...'}
+                </p>
+                {images.length > 0 && (
+                  <Progress value={uploadProgress} className="h-2" />
+                )}
+              </div>
             </div>
           </div>
         )}
